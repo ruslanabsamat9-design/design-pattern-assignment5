@@ -1,6 +1,6 @@
 package flight.fare;
 
-/** Selects the pricing variant inside the one big FareCalculator (the "before" design). */
+/** Test-only enum: names the fare variants so the shared behaviour test can address all of them. */
 public enum FareType {
     DISTANCE,
     DEMAND,

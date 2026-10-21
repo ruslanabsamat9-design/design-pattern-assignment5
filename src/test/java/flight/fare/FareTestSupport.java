@@ -12,6 +12,12 @@ final class FareTestSupport {
     }
 
     static FareCalculator calculatorFor(FareType type, ExchangeRateProvider rates) {
-        return new FareCalculator(type, rates);
+        FareStrategy strategy = switch (type) {
+            case DISTANCE -> new DistanceFareStrategy();
+            case DEMAND -> new DemandFareStrategy();
+            case LAST_MINUTE -> new LastMinuteFareStrategy();
+            case INTERNATIONAL -> new InternationalFareStrategy(rates);
+        };
+        return new FareCalculator(strategy);
     }
 }
