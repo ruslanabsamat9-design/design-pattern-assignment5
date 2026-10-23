@@ -1,89 +1,165 @@
-# Flight Reservation – Strategy Pattern (Assignment 5)
+# Flight Reservation: Strategy Pattern (Assignment 5)
 
-Domain: **flight reservation**. Two families of interchangeable algorithms are implemented with the Strategy pattern:
+Domain: **flight reservation**. Two families of interchangeable algorithms use the Strategy pattern.
 
-| Family | What varies | Strategies |
+| Family | The job that can be done in different ways | Strategies |
 |---|---|---|
-| **Fare** | how a ticket price is calculated | Distance, Demand, LastMinute, International |
-| **Seat** | how seats are chosen | Window, FrontRowsFirst, GroupTogether, EmptyRow |
+| **Price** | calculate the ticket price | `RegularPrice`, `LastMinutePrice`, `InternationalPrice` |
+| **Refund** | calculate the money returned on cancellation | `NonRefundable`, `FlexibleRefund`, `TimeBasedRefund` |
 
-Java 17, JUnit 5, Maven.
+Each family has a **Strategy interface**, three **strategies**, a **context** (`PriceCalculator`, `RefundCalculator`) and a **Selector** (`PriceSelector`, `RefundSelector`).
+The contexts contain no `if` / `switch`. Only the Selectors decide.
 
 ## How to run
 
 ```bash
-mvn test                      # all tests
-mvn compile exec:java         # console demo (flight.Main)
+mvn test                  # all tests
+mvn compile exec:java     # console demo (flight.Main)
 ```
 
-Without Maven (IntelliJ / VS Code): open the folder as a Maven project, run `flight.Main`, run tests from `src/test/java`.
-
-## Class responsibilities
-
-One sentence each (max 25 words, none of the words if / and / or / but).
+## Classes and responsibilities
 
 | Class | Responsibility |
 |---|---|
-| `FlightRequest` | Holds route, distance, days to departure, occupancy percent, international flag for one fare calculation. |
-| `ExchangeRateProvider` | Declares how currency rates are obtained from any source. |
-| `SimulatedExchangeRateProvider` | Returns fixed currency rates from a built-in table. |
-| `Prices` | Provides base rate, tax constants, rounding for money values. |
-| `FareStrategy` | Declares one method that turns a flight request into a ticket price. |
-| `DistanceFareStrategy` | Prices a ticket as distance times base rate plus tax. |
-| `DemandFareStrategy` | Multiplies the base price by a factor that grows with flight occupancy. |
-| `LastMinuteFareStrategy` | Multiplies the base price by a factor that grows as departure approaches. |
-| `InternationalFareStrategy` | Prices a ticket in US dollars then converts it with the current exchange rate. |
-| `FareCalculator` (context) | Holds the current fare strategy, delegates every price calculation to it. |
-| `FareStrategySelector` | Chooses the fare strategy matching the current request situation. |
-| `Seat` | Represents one seat by row number, letter. |
-| `Flight` | Stores the seat map with occupied seats for one flight. |
-| `SeatRequest` | Holds group size, seat preference of one booking. |
-| `SeatPreference` | Lists the seat wishes a passenger may express. |
-| `SeatAssignmentStrategy` | Declares one method that picks seats for a request. |
-| `WindowSeatStrategy` | Picks the first free window seats in row order. |
-| `FrontRowsFirstStrategy` | Picks the first free seats starting from the front row. |
-| `GroupTogetherStrategy` | Picks neighbouring free seats in one row for a group. |
-| `EmptyRowStrategy` | Picks seats in the row with the most free seats. |
-| `SeatAssigner` (context) | Holds the current seat strategy, delegates every assignment to it. |
-| `SeatStrategySelector` | Chooses the seat strategy matching group size, passenger preference. |
-| `Main` | Demonstrates both families, both selectors, runtime switching in the console. |
+| `Trip` | Holds route, distance, days until departure, international flag of one flight. |
+| `Booking` | Holds paid price, days until departure, ticket type of one paid ticket. |
+| `TicketType` | Lists the ticket kinds BASIC, STANDARD, BUSINESS. |
+| `ExchangeRateProvider` | Declares how the dollar rate is obtained from any source. |
+| `SimulatedExchangeRateProvider` | Returns a fixed dollar rate without calling a real service. |
+| `PriceStrategy` | Declares one method that calculates a ticket price for a trip. |
+| `RegularPrice` | Multiplies the distance by the price per kilometre. |
+| `LastMinutePrice` | Multiplies the regular price by a factor that grows as departure approaches. |
+| `InternationalPrice` | Calculates the price in dollars then converts it with the exchange rate. |
+| `PriceCalculator` (context) | Keeps the current price strategy, delegates every calculation to it. |
+| `PriceSelector` | Chooses the price strategy matching the trip. |
+| `RefundStrategy` | Declares one method that calculates the money returned for a booking. |
+| `NonRefundable` | Returns nothing. |
+| `FlexibleRefund` | Returns the paid price minus a fixed cancellation fee. |
+| `TimeBasedRefund` | Returns a share of the paid price that shrinks as departure approaches. |
+| `RefundCalculator` (context) | Keeps the current refund strategy, delegates every calculation to it. |
+| `RefundSelector` | Chooses the refund strategy matching the ticket type. |
+| `Main` | Shows manual choice, automatic choice, runtime switching in the console. |
 
 ### Selector rules (first match wins)
 
-**FareStrategySelector**
+**PriceSelector:** international flight → `InternationalPrice`; 3 days or less left → `LastMinutePrice`; otherwise → `RegularPrice`.
 
-1. departure in 2 days or less → `LastMinuteFareStrategy`
-2. flight at least 80 % full → `DemandFareStrategy`
-3. international flight → `InternationalFareStrategy`
-4. otherwise → `DistanceFareStrategy`
+**RefundSelector:** BASIC ticket → `NonRefundable`; BUSINESS ticket → `FlexibleRefund`; STANDARD ticket → `TimeBasedRefund`.
 
-**SeatStrategySelector**
+## UML class diagrams
 
-1. more than one passenger → `GroupTogetherStrategy`
-2. preference `WINDOW` → `WindowSeatStrategy`
-3. preference `MORE_SPACE` → `EmptyRowStrategy`
-4. otherwise → `FrontRowsFirstStrategy`
+Solid arrow = "keeps a reference to". Dashed arrow with open head = "returns / uses". Dashed line with hollow triangle = "implements".
+(GitHub draws these diagrams automatically from the text below.)
 
-The Selectors are the only classes that contain `if` / `switch` on the situation. The contexts (`FareCalculator`, `SeatAssigner`) contain none.
+### Price family
 
-## Why Strategy (and not State or Template Method)
+```mermaid
+classDiagram
+    direction TB
+    class PriceStrategy {
+        <<interface>>
+        +calculate(Trip trip) double
+    }
+    class PriceCalculator {
+        -PriceStrategy strategy
+        +PriceCalculator(PriceStrategy strategy)
+        +setStrategy(PriceStrategy strategy)
+        +calculate(Trip trip) double
+    }
+    class PriceSelector {
+        +select(Trip trip) PriceStrategy
+    }
+    class RegularPrice {
+        +calculate(Trip trip) double
+    }
+    class LastMinutePrice {
+        +calculate(Trip trip) double
+    }
+    class InternationalPrice {
+        +calculate(Trip trip) double
+    }
+    PriceStrategy <|.. RegularPrice
+    PriceStrategy <|.. LastMinutePrice
+    PriceStrategy <|.. InternationalPrice
+    PriceCalculator --> PriceStrategy : strategy
+    PriceSelector ..> PriceStrategy : returns
+```
 
-The fare and seat algorithms are **interchangeable ways of doing the same job**. The client (or a Selector) picks one from outside, from facts about the request, then hands it to a context. A strategy does not know about the other strategies and does not decide when it is replaced.
+### Isolation from change (exchange rate)
 
-**Not State.** In State the object changes its own behaviour because its internal state changes, and the states usually know the next state and trigger transitions. Here nothing is a life-cycle: `LastMinuteFareStrategy` never turns into `DemandFareStrategy` by itself. The change is decided externally by the Selector or the caller.
+```mermaid
+classDiagram
+    direction TB
+    class InternationalPrice {
+        -ExchangeRateProvider rates
+        +calculate(Trip trip) double
+    }
+    class ExchangeRateProvider {
+        <<interface>>
+        +usdToKzt() double
+    }
+    class SimulatedExchangeRateProvider {
+        +usdToKzt() double
+    }
+    class FakeExchangeRateProvider {
+        +usdToKzt() double
+    }
+    InternationalPrice --> ExchangeRateProvider : uses
+    ExchangeRateProvider <|.. SimulatedExchangeRateProvider
+    ExchangeRateProvider <|.. FakeExchangeRateProvider
+```
 
-**Not Template Method.** Template Method fixes the skeleton of an algorithm in a base class and lets subclasses override single steps, so variation is by inheritance and is chosen at compile time. Our variants share no skeleton: a distance fare and a currency-converted fare have different structure, not only different steps. Strategy uses composition, so a variant can be swapped at runtime (`setStrategy`) and a new variant is a new class with no change to existing ones.
+`SimulatedExchangeRateProvider` is used by the demo. `FakeExchangeRateProvider` (test code) is used by the tests.
 
-## Refactoring with Git (fare family)
+### Refund family
 
-| Step | Git tag | Content |
+```mermaid
+classDiagram
+    direction TB
+    class RefundStrategy {
+        <<interface>>
+        +refund(Booking booking) double
+    }
+    class RefundCalculator {
+        -RefundStrategy strategy
+        +RefundCalculator(RefundStrategy strategy)
+        +setStrategy(RefundStrategy strategy)
+        +refund(Booking booking) double
+    }
+    class RefundSelector {
+        +select(Booking booking) RefundStrategy
+    }
+    class NonRefundable {
+        +refund(Booking booking) double
+    }
+    class FlexibleRefund {
+        +refund(Booking booking) double
+    }
+    class TimeBasedRefund {
+        +refund(Booking booking) double
+    }
+    RefundStrategy <|.. NonRefundable
+    RefundStrategy <|.. FlexibleRefund
+    RefundStrategy <|.. TimeBasedRefund
+    RefundCalculator --> RefundStrategy : strategy
+    RefundSelector ..> RefundStrategy : returns
+```
+
+## Why Strategy (not State, not Template Method)
+
+Price and refund are **one job done in several interchangeable ways**. The caller (or a Selector) picks the way from outside and gives it to a context. A strategy knows nothing about the other strategies.
+
+- **Not State.** In State an object changes its behaviour because its own state changes, and states trigger the next state. Here `LastMinutePrice` never turns into `RegularPrice` by itself. The Selector or the caller decides.
+- **Not Template Method.** Template Method fixes the skeleton of an algorithm in a base class, subclasses override single steps, and the choice is made by inheritance. Our formulas share no skeleton, and with composition we can swap them at runtime with `setStrategy`. A new formula is a new class, no old class changes.
+
+## Refactoring with Git (price family)
+
+| Step | Git tag | What it contains |
 |---|---|---|
-| Before | `before-refactoring` | `FareCalculator` with one `switch` on `FareType` and `if/else` chains |
-| After | `after-refactoring` | `FareStrategy` + 4 classes + `FareCalculator` context without `if/switch` |
+| Before | `before-refactoring` | `PriceCalculator` with one `switch` on `PriceType` |
+| After | `after-refactoring` | `PriceStrategy` + 3 strategies + `PriceCalculator` without `if` / `switch` |
 
 ```bash
-git show before-refactoring     # the "bad" version
-git show after-refactoring      # the refactored version
 git diff before-refactoring after-refactoring
 ```
 
@@ -92,39 +168,33 @@ Links (replace after pushing to GitHub):
 - Before: `https://github.com/<user>/<repo>/tree/before-refactoring`
 - After: `https://github.com/<user>/<repo>/tree/after-refactoring`
 
-The test class `FareBehaviourTest` is **identical** on both commits and passes on both. Only the tiny adapter `FareTestSupport` differs, because the constructor of `FareCalculator` changed.
+The test class `PriceBehaviourTest` is **the same file** on both commits and passes on both. Only the small helper `TestPrices` differs, because the constructor of `PriceCalculator` changed.
 
-## Isolation from change (Clean Code, Chapter 10)
+## Isolation from change (Clean Code, chapter 10)
 
-`InternationalFareStrategy` needs a currency rate, which is data from outside the system. The strategy depends only on our own interface `ExchangeRateProvider`, never on a concrete source.
+`InternationalPrice` needs the dollar rate, which is data from outside the system. It depends only on our own interface `ExchangeRateProvider`.
 
-- Production / demo: `SimulatedExchangeRateProvider` (built-in table).
-- Tests: `FakeExchangeRateProvider` (fixed rate, e.g. 1 USD = 500 KZT), so tests are deterministic.
-- A real web API can be added later as a new `ExchangeRateProvider` with no change to the strategy.
+- Demo: `SimulatedExchangeRateProvider` (fixed number).
+- Tests: `FakeExchangeRateProvider` (1 USD = 500 KZT), so tests never change.
+- A real web service can be added later as one new class implementing the interface. The strategy stays untouched.
 
-## Tests (JUnit 5, 96 test cases)
+## Tests (JUnit 5)
 
-| Test class | What it covers |
+| Test class | What it checks |
 |---|---|
-| `FareBehaviourTest` | exact prices of every fare variant (runs on both refactoring commits) |
-| `FareStrategyTest` | each fare strategy, boundary values |
-| `FareStrategyParameterizedTest` | `@ParameterizedTest` on all fare strategies: never negative, longer flight never cheaper |
-| `FareCalculatorTest` | context: delegation, `setStrategy`, null check |
-| `FareStrategySelectorTest` | every Selector rule, rule order, boundaries |
-| `SeatStrategyTest` | each seat strategy |
-| `SeatStrategyParameterizedTest` | `@ParameterizedTest` on all seat strategies: free, distinct, correct count, nothing booked |
-| `SeatAssignerTest` | context: delegation, `setStrategy`, null check |
-| `SeatStrategySelectorTest` | every Selector rule, rule order |
-| `FlightTest` | seat map and booking |
+| `PriceBehaviourTest` | the result of every price strategy, plus one `@ParameterizedTest` over all of them |
+| `PriceSelectorTest` | every `PriceSelector` rule |
+| `RefundStrategyTest` | every refund strategy, plus one `@ParameterizedTest` over all of them |
+| `RefundSelectorTest` | every `RefundSelector` rule |
+| `CalculatorsTest` | both contexts delegate, strategy can be switched at runtime |
 
 ## Project structure
 
 ```
 src/main/java/flight/
-  Main.java
-  model/   FlightRequest, Seat, SeatRequest, SeatPreference, Flight
+  Main.java, Trip.java, Booking.java, TicketType.java
   data/    ExchangeRateProvider, SimulatedExchangeRateProvider
-  fare/    FareStrategy, 4 strategies, FareCalculator, FareStrategySelector, Prices
-  seat/    SeatAssignmentStrategy, 4 strategies, SeatAssigner, SeatStrategySelector
+  price/   PriceStrategy, RegularPrice, LastMinutePrice, InternationalPrice, PriceCalculator, PriceSelector
+  refund/  RefundStrategy, NonRefundable, FlexibleRefund, TimeBasedRefund, RefundCalculator, RefundSelector
 src/test/java/flight/ ...
 ```
